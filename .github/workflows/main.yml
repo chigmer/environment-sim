@@ -1,0 +1,50 @@
+name: Build Environment Sim Executables
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: 
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        # We use macos-14 because it features Apple Silicon hardware to cleanly compile universal apps
+        os: [macos-14, windows-latest]
+
+    steps:
+    - name: Check out repository code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller
+       
+        pip install pygame
+
+    # WINDOWS BUILD: Packages the executable and maps the assets folder
+    - name: Build Executable (Windows)
+      if: matrix.os == 'windows-latest'
+      run: pyinstaller --onefile --add-data "assets;assets" environment.py
+
+    # MAC BUILD: Forced backward-compatibility for Monterey (12.0) + Universal Architecture
+    - name: Build Executable (macOS Universal)
+      if: matrix.os == 'macos-14'
+      env:
+        MACOSX_DEPLOYMENT_TARGET: "12.0"
+      run: pyinstaller --onefile --target-arch universal2 --add-data "assets:assets" environment.py
+
+    # UPLOAD ARTIFACTS: Makes the finished binaries downloadable from your GitHub Actions tab
+    - name: Upload Finished Files
+      uses: actions/upload-artifact@v4
+      with:
+        name: environment-sim-${{ matrix.os }}
+        path: dist/
